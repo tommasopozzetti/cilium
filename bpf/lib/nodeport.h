@@ -1696,7 +1696,20 @@ static __always_inline int encap_geneve_dsr_opt4(struct __ctx_buff *ctx, int l3_
 #endif
 
 	info = lookup_ip4_remote_endpoint(ip4->daddr, 0);
-	if (!info || !info->flag_has_tunnel_ep)
+	if (!info)
+		return DROP_NO_TUNNEL_ENDPOINT;
+
+	/* when the destination is a remote node, the ipcache might not have a
+	 * tunnel endpoint associated with it.
+	 * However, the IP itself can be used as a tunnel endpoint as it will be
+	 * directly reachable
+	 */
+	if (identity_is_remote_node(info->sec_identity) && !info->flag_has_tunnel_ep) {
+		info->flag_has_tunnel_ep = true;
+		info->tunnel_endpoint.ip4 = ip4->daddr;
+	}
+	
+	if (!info->flag_has_tunnel_ep)
 		return DROP_NO_TUNNEL_ENDPOINT;
 
 	tunnel_endpoint = info->tunnel_endpoint.ip4;
